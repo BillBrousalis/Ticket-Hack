@@ -1,0 +1,239 @@
+#include "pn532.h"
+
+/* Wakeup - ACK Sequences */
+std::vector<uint8_t> wakeup_seq {0x55, 0x55, 0x00, 0x00, 0x00};
+std::vector<uint8_t> pn532_ack {0x00, 0x00, 0xff, 0x00, 0xff, 0x00};
+
+pn532::pn532(std::string const dev_name, int t)
+{
+  /* Set DEBUG env var (values 0 - 5) for debugging messages */
+  const char *env = getenv("DEBUG");
+  if(env == NULL) {
+    DEBUG_LVL = 0;
+  }
+  else {
+    DEBUG_LVL = std::stoi(env);
+  }
+  std::cout << "[ DEBUG LEVEL = " << DEBUG_LVL << " ]" << std::endl;
+
+  timeout = t;
+  std::cout << "[+] Using device " << dev_name << std::endl;
+  ser.open_serial(dev_name);
+}
+
+pn532::~pn532()
+{
+  std::cout << "[-] Closing PN532..." << std::endl;
+}
+
+int pn532::write_frame(std::vector<uint8_t> dat)
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::write_frame )" << std::endl; }
+  int sz = (int)dat.size();
+  assert(0 < sz  && sz < 0xff);
+  int frame_sz = sz + 7;
+  std::vector<uint8_t> frame(sz+7, 0x00);
+  frame[0] = PN532_PREAMBLE;
+  frame[1] = PN532_STARTCODE1;
+  frame[2] = PN532_STARTCODE2;
+  frame[3] = sz;
+  frame[4] = (~sz + 0x01) & 0xff;
+  for(int i=0; i<sz; ++i) {
+    frame[5+i] = dat[i];
+  }
+  uint8_t chksum = checksum(dat, 0xff);
+  frame[frame_sz-2] = ~chksum & 0xff;
+  frame[frame_sz-1] = PN532_POSTAMBLE;
+  int ack = 0;
+  while(!ack) {
+    if(DEBUG_LVL >= 1) { hprint(frame, "( write_frame ) frame:"); }
+    ser.write(frame);
+    ack = ack_wait();
+    sleepms(10);
+  }
+  return ack;
+}
+
+/* echo test */
+void pn532::echo_test()
+{
+  std::vector<uint8_t> bufrecv;
+  std::vector<uint8_t> echo_bytes {0x0a, 0x0b, 0xa0, 0xb0, 0x10, 0xff, 0x00, 0x01, 0x02, 0x03};
+  hprint(bufrecv, "[+] ECHO: Sending");
+  ser.write(echo_bytes);
+  ser.read(bufrecv, (int)echo_bytes.size());
+  hprint(bufrecv, "[+] ECHO: Received");
+  std::cout << "[+] Echo test complete." << std::endl;
+}
+
+void pn532::read_frame(std::vector<uint8_t> &buf, int res_length)
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::read_frame )" << std::endl; }
+
+  std::vector<uint8_t> response;
+  ser.read(response, res_length+8);
+
+  if(DEBUG_LVL >= 2) { hprint(response, "( pn532::read_frame ) response:"); }
+
+  assert(pn532_ack.size() <= response.size());
+  if(equal(pn532_ack, response, 0, (int)pn532_ack.size())) {
+    std::cerr << "[-] !!! NO CARD !!!" << std::endl;
+    exit(-1);
+  }
+  if(response[0] != 0x00) {
+    std::cerr << "[-] !!! response[0] != 0x00 !!!" << std::endl;
+    exit(-1);
+  }
+  int off = 1;
+  while(response[off] == 0x00) {
+    off++;
+    if(off >= (int)response.size()) {
+      std::cout << "[-] !!! Response frame preamble does not contain 00:FF (1) !!!" << std::endl;
+      exit(-1);
+    }
+  }
+  if(response[off] != 0xff) {
+    std::cerr << "[-] !!! Response frame preamble does not contain 00:FF (2) !!!" << std::endl;
+    exit(-1);
+  }
+  off++;
+  if(off >= (int)response.size()) {
+    std::cerr << "[-] !!! Response does not contain data !!!" << std::endl;
+    exit(-1);
+  }
+  uint8_t frame_len = response[off];
+  if(((frame_len + response[off+1]) & 0xff) != 0x00) {
+    std::cerr << "[-] !!! Response length checksum does not match length !!!" << std::endl;
+    exit(-1);
+  }
+  std::vector<uint8_t> tmp (frame_len+1, 0x00);
+  for(int i=0; i<(int)tmp.size(); ++i) {
+    tmp[i] = response[off+2+i];
+  }
+
+  if(DEBUG_LVL >= 2) {
+    printf("frame_len = 0x%02x\n", frame_len);
+    hprint(tmp, "( pn532::read_frame ) tmp:");
+  }
+
+  uint8_t chksum = checksum(tmp, 0x00);
+  if(chksum != 0x00) {
+    std::cerr << "[-] !!! Response checksum is not 0x00 !!!" << std::endl;
+    exit(-1);
+  }
+  assert(tmp.size() <= buf.size());
+  for(int i=0; i<(int)tmp.size(); ++i) {
+    buf[i] = tmp[i];
+  }
+}
+
+int pn532::ack_wait()
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ack_wait )" << std::endl; }
+
+  int ack = 0;
+  int rx_size = pn532_ack.size();
+  std::vector<uint8_t> rx (rx_size, 0x00);
+
+  auto start = get_time();
+  auto now = get_time();
+  while(elapsed_time_ms(now, start) < timeout && ack != 1) {
+    sleepms(10);
+    rx.erase(rx.begin());
+    rx.push_back(ser.readbyte(timeout=timeout));
+    if(pn532_ack == rx) {
+      ack = 1;
+    }
+    now = get_time();
+    if(DEBUG_LVL >= 4) { hprint(rx, "( pn532::ack_wait ) RX:"); }
+  }
+  if(DEBUG_LVL >= 4) { std::cout << "( ACK = " << ack << " )" << std::endl; }
+  return ack;
+}
+
+void pn532::wakeup()
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::wakeup )" << std::endl; }
+  ser.write(wakeup_seq);
+}
+
+void pn532::SAM_config()
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::SAM_config )" << std::endl; }
+  std::vector<uint8_t> empty;
+  std::vector<uint8_t> params {0x01, 0x14, 0x01};
+  call_func(empty, PN532_COMMAND_SAMCONFIGURATION, 0, params);
+}
+
+void pn532::call_func(std::vector<uint8_t> &buf, uint8_t command, int res_length, std::vector<uint8_t> params)
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::call_func )" << std::endl; }
+  std::vector<uint8_t> data (params.size()+2, 0x00);
+  data[0] = PN532_HOSTTOPN532;
+  data[1] = command;
+  for(int i=0; i<(int)params.size(); ++i) {
+    data[2+i] = params[i];
+  }
+
+  if(DEBUG_LVL >= 1) { hprint(data, "( pn532::call_func ) Sending data:"); }
+
+  if(!write_frame(data)) {
+    return;
+  }
+
+  std::vector<uint8_t> response (res_length+3, 0x00);
+  read_frame(response, response.size());
+
+  if(DEBUG_LVL >= 2) { hprint(response, "( pn532::call_func ) read_frame response:"); }
+
+  if(response[0] != PN532_PN532TOHOST || response[1] != (command+0x01)) {
+    std::cerr << "!!! Unexpected command response !!!" << std::endl;
+  }
+
+  if(res_length == 0) { return; }
+  for(int i=0; i<(int)response.size()-2-1; ++i) {
+    buf[i] = response[2+i];
+  }
+}
+
+void pn532::get_firmware_version(std::vector<uint8_t> &buf)
+{
+  assert(buf.size() >= FIRMWARE_VERSION_LEN);
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::get_firmware_version )" << std::endl; }
+  std::fill(buf.begin(), buf.end(), 0x00);
+  call_func(buf, PN532_COMMAND_GETFIRMWAREVERSION, FIRMWARE_VERSION_LEN, std::vector<uint8_t>());
+}
+
+void pn532::read_passive_target(std::vector<uint8_t> &buf, int baud)
+{
+  std::fill(buf.begin(), buf.end(), 0x00);
+  std::vector<uint8_t> response (17, 0x00);
+  std::vector<uint8_t> params {0x01, (uint8_t)baud};
+  call_func(response, PN532_COMMAND_INLISTPASSIVETARGET, 17, params);
+  assert(response[0] == 0x01);
+  assert(response[5] <= 0x07);
+  assert((uint8_t)buf.size() >= response[5]);
+  for(int i=0; i<response[5]; ++i) {
+    buf[i] = response[6+i];
+  }
+}
+
+void pn532::ultralight_read_page(std::vector<uint8_t> &buf, int page)
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ultralight_read_page )" << std::endl; }
+  assert(buf.size() >= PAGELENGTH);
+  std::fill(buf.begin(), buf.end(), 0x00);
+  std::vector<uint8_t> response (17, 0x00);
+  std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_READ, (uint8_t)page};
+  call_func(response, PN532_COMMAND_INDATAEXCHANGE, 17, params);
+  assert(response[0] == 0x00);
+  for(int i=0; i<PAGELENGTH; ++i) {
+    buf[i] = response[1+i];
+  }
+}
+
+int pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)
+{
+  if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ultralight_write_page )" << std::endl; }
+  return 0;
+}
