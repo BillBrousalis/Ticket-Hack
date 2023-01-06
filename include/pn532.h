@@ -2,6 +2,7 @@
 #define _PN532_H_
 
 #include <iostream>
+#include <vector>
 #include <string>
 #include <cstring>
 #include <cstdlib>
@@ -83,17 +84,17 @@ public:
   void echo_test();
   void wakeup();
   void SAM_config();
-  void call_func(std::vector<uint8_t> &buf, uint8_t command, int res_length, std::vector<uint8_t> params);
-  void get_firmware_version(std::vector<uint8_t> &buf);
-  void read_passive_target(std::vector<uint8_t> &buf, int baud=PN532_MIFARE_ISO14443A);
-  void ultralight_read_page(std::vector<uint8_t> &buf, int page);
+  std::vector<uint8_t> call_func(uint8_t command, int res_length, std::vector<uint8_t> params);
+  std::vector<uint8_t> get_firmware_version();
+  std::vector<uint8_t> read_passive_target(int baud=PN532_MIFARE_ISO14443A);
+  std::vector<uint8_t> ultralight_read_page(int page);
   int ultralight_write_page(std::vector<uint8_t> dat, int page);
 
 private:
   int DEBUG_LVL;
   int timeout;
   int write_frame(std::vector<uint8_t> dat);
-  void read_frame(std::vector<uint8_t> &buf, int res_length);
+  std::vector<uint8_t> read_frame(int res_length);
   int ack_wait();
 };
 

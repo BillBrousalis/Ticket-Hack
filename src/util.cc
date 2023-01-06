@@ -39,10 +39,19 @@ void hprint(std::vector<uint8_t> buf, std::string info, char separator, int limi
   std::cout << std::endl;
 }
 
-bool equal(std::vector<uint8_t> arr1, std::vector<uint8_t> arr2, int lo, int hi)
+bool equal_slice(std::vector<uint8_t> arr1, std::vector<uint8_t> arr2, int lo, int hi)
 {
+  assert(lo >= 0 && lo < hi);
   for(int i=lo; i<hi; ++i) {
     if(arr1[i] != arr2[i]) { return false; }
   }
   return true;
+}
+
+std::vector<uint8_t> slice(std::vector<uint8_t> vec, int lo, int hi)
+{
+  assert(lo < hi);
+  std::vector<uint8_t> sliced (hi-lo);
+  std::copy(vec.begin()+lo, vec.begin()+hi, sliced.begin());
+  return sliced;
 }

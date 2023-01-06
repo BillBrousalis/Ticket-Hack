@@ -29,17 +29,16 @@ uint8_t Serial::readbyte(int timeout)
   return (uint8_t)c;
 }
 
-void Serial::read(std::vector<uint8_t> &buf, int expected_sz, int timeout)
+std::vector<uint8_t> Serial::read(int expected_sz, int timeout)
 {
-  assert(buf.size() == 0);
+  std::vector<uint8_t> buf;
   try {
     for(int i=0; i<expected_sz; ++i) {
       buf.push_back(readbyte());
     }
   }
-  catch(const LibSerial::ReadTimeout&) {
-    return;
-  }
+  catch(const LibSerial::ReadTimeout&) {}
+  return buf;
 }
 
 void Serial::write(std::vector<uint8_t> buf)

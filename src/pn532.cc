@@ -54,29 +54,27 @@ int pn532::write_frame(std::vector<uint8_t> dat)
   return ack;
 }
 
-/* echo test */
+/* echo test (loopback cable) */
 void pn532::echo_test()
 {
-  std::vector<uint8_t> bufrecv;
   std::vector<uint8_t> echo_bytes {0x0a, 0x0b, 0xa0, 0xb0, 0x10, 0xff, 0x00, 0x01, 0x02, 0x03};
-  hprint(bufrecv, "[+] ECHO: Sending");
+  hprint(echo_bytes, "[+] ECHO: Sending");
   ser.write(echo_bytes);
-  ser.read(bufrecv, (int)echo_bytes.size());
+  std::vector<uint8_t> bufrecv = ser.read((int)echo_bytes.size());
   hprint(bufrecv, "[+] ECHO: Received");
   std::cout << "[+] Echo test complete." << std::endl;
 }
 
-void pn532::read_frame(std::vector<uint8_t> &buf, int res_length)
+std::vector<uint8_t> pn532::read_frame(int res_length)
 {
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::read_frame )" << std::endl; }
 
-  std::vector<uint8_t> response;
-  ser.read(response, res_length+8);
+  std::vector<uint8_t> response = ser.read(res_length+8);
 
   if(DEBUG_LVL >= 2) { hprint(response, "( pn532::read_frame ) response:"); }
 
   assert(pn532_ack.size() <= response.size());
-  if(equal(pn532_ack, response, 0, (int)pn532_ack.size())) {
+  if(equal_slice(pn532_ack, response, 0, (int)pn532_ack.size())) {
     std::cerr << "[-] !!! NO CARD !!!" << std::endl;
     exit(-1);
   }
@@ -106,25 +104,18 @@ void pn532::read_frame(std::vector<uint8_t> &buf, int res_length)
     std::cerr << "[-] !!! Response length checksum does not match length !!!" << std::endl;
     exit(-1);
   }
-  std::vector<uint8_t> tmp (frame_len+1, 0x00);
-  for(int i=0; i<(int)tmp.size(); ++i) {
-    tmp[i] = response[off+2+i];
-  }
+  std::vector<uint8_t> frame = slice(response, off+2, off+2+frame_len+1);//(frame_len+1, 0x00);
 
   if(DEBUG_LVL >= 2) {
     printf("frame_len = 0x%02x\n", frame_len);
-    hprint(tmp, "( pn532::read_frame ) tmp:");
+    hprint(frame, "( pn532::read_frame ) frame:");
   }
 
-  uint8_t chksum = checksum(tmp, 0x00);
-  if(chksum != 0x00) {
+  if(checksum(frame, 0x00) != 0x00) {
     std::cerr << "[-] !!! Response checksum is not 0x00 !!!" << std::endl;
     exit(-1);
   }
-  assert(tmp.size() <= buf.size());
-  for(int i=0; i<(int)tmp.size(); ++i) {
-    buf[i] = tmp[i];
-  }
+  return frame;
 }
 
 int pn532::ack_wait()
@@ -160,76 +151,63 @@ void pn532::wakeup()
 void pn532::SAM_config()
 {
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::SAM_config )" << std::endl; }
-  std::vector<uint8_t> empty;
   std::vector<uint8_t> params {0x01, 0x14, 0x01};
-  call_func(empty, PN532_COMMAND_SAMCONFIGURATION, 0, params);
+  call_func(PN532_COMMAND_SAMCONFIGURATION, 0, params);
 }
 
-void pn532::call_func(std::vector<uint8_t> &buf, uint8_t command, int res_length, std::vector<uint8_t> params)
+std::vector<uint8_t> pn532::call_func(uint8_t command, int res_length, std::vector<uint8_t> params)
 {
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::call_func )" << std::endl; }
-  std::vector<uint8_t> data (params.size()+2, 0x00);
-  data[0] = PN532_HOSTTOPN532;
-  data[1] = command;
+
+  std::vector<uint8_t> data {PN532_HOSTTOPN532, command};
   for(int i=0; i<(int)params.size(); ++i) {
-    data[2+i] = params[i];
+    data.push_back(params[i]);
   }
 
   if(DEBUG_LVL >= 1) { hprint(data, "( pn532::call_func ) Sending data:"); }
 
   if(!write_frame(data)) {
-    return;
+    return std::vector<uint8_t>();
   }
 
-  std::vector<uint8_t> response (res_length+3, 0x00);
-  read_frame(response, response.size());
+  std::vector<uint8_t> response = read_frame(res_length+3);
 
   if(DEBUG_LVL >= 2) { hprint(response, "( pn532::call_func ) read_frame response:"); }
 
   if(response[0] != PN532_PN532TOHOST || response[1] != (command+0x01)) {
     std::cerr << "!!! Unexpected command response !!!" << std::endl;
+    exit(-1);
   }
 
-  if(res_length == 0) { return; }
-  for(int i=0; i<(int)response.size()-2-1; ++i) {
-    buf[i] = response[2+i];
+  if(res_length == 0) {
+    return std::vector<uint8_t>();
   }
+
+  return slice(response, 2, (int)response.size());
 }
 
-void pn532::get_firmware_version(std::vector<uint8_t> &buf)
+std::vector<uint8_t> pn532::get_firmware_version()
 {
-  assert(buf.size() >= FIRMWARE_VERSION_LEN);
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::get_firmware_version )" << std::endl; }
-  std::fill(buf.begin(), buf.end(), 0x00);
-  call_func(buf, PN532_COMMAND_GETFIRMWAREVERSION, FIRMWARE_VERSION_LEN, std::vector<uint8_t>());
+  return call_func(PN532_COMMAND_GETFIRMWAREVERSION, FIRMWARE_VERSION_LEN, std::vector<uint8_t>());
 }
 
-void pn532::read_passive_target(std::vector<uint8_t> &buf, int baud)
+std::vector<uint8_t> pn532::read_passive_target(int baud)
 {
-  std::fill(buf.begin(), buf.end(), 0x00);
-  std::vector<uint8_t> response (17, 0x00);
   std::vector<uint8_t> params {0x01, (uint8_t)baud};
-  call_func(response, PN532_COMMAND_INLISTPASSIVETARGET, 17, params);
+  std::vector<uint8_t> response = call_func(PN532_COMMAND_INLISTPASSIVETARGET, 17, params);
   assert(response[0] == 0x01);
   assert(response[5] <= 0x07);
-  assert((uint8_t)buf.size() >= response[5]);
-  for(int i=0; i<response[5]; ++i) {
-    buf[i] = response[6+i];
-  }
+  return slice(response, 6, 6+response[5]);
 }
 
-void pn532::ultralight_read_page(std::vector<uint8_t> &buf, int page)
+std::vector<uint8_t> pn532::ultralight_read_page(int page)
 {
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ultralight_read_page )" << std::endl; }
-  assert(buf.size() >= PAGELENGTH);
-  std::fill(buf.begin(), buf.end(), 0x00);
-  std::vector<uint8_t> response (17, 0x00);
   std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_READ, (uint8_t)page};
-  call_func(response, PN532_COMMAND_INDATAEXCHANGE, 17, params);
+  std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 17, params);
   assert(response[0] == 0x00);
-  for(int i=0; i<PAGELENGTH; ++i) {
-    buf[i] = response[1+i];
-  }
+  return slice(response, 1, PAGELENGTH+1);
 }
 
 int pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)

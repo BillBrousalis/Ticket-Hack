@@ -15,7 +15,7 @@ public:
   void open_serial(std::string const dev_name);
   void close_serial();
   uint8_t readbyte(int timeout=DEFAULT_TIMEOUT);
-  void read(std::vector<uint8_t> &buf, int expected_sz, int timeout=DEFAULT_TIMEOUT);
+  std::vector<uint8_t> read(int expected_sz, int timeout=DEFAULT_TIMEOUT);
   void write(std::vector<uint8_t> buf);
 
 private:
