@@ -27,41 +27,14 @@
 #define PN532_PN532TOHOST                   0xD5
 
 #define PN532_COMMAND_GETFIRMWAREVERSION    0x02
-#define PN532_COMMAND_GETGENERALSTATUS      0x04
-#define PN532_COMMAND_READGPIO              0x0C
-#define PN532_COMMAND_WRITEGPIO             0x0E
-#define PN532_COMMAND_SETSERIALBAUDRATE     0x10
-#define PN532_COMMAND_SETPARAMETERS         0x12
 #define PN532_COMMAND_SAMCONFIGURATION      0x14
 #define PN532_COMMAND_POWERDOWN             0x16
 #define PN532_COMMAND_INLISTPASSIVETARGET   0x4A
 #define PN532_COMMAND_INDATAEXCHANGE        0x40
-#define PN532_COMMAND_INCOMMUNICATETHRU     0x42
-#define PN532_COMMAND_INDESELECT            0x44
-#define PN532_COMMAND_INRELEASE             0x52
-#define PN532_COMMAND_INSELECT              0x54
-#define PN532_COMMAND_INAUTOPOLL            0x60
-
-#define PN532_RESPONSE_INDATAEXCHANGE       0x41
-#define PN532_RESPONSE_INLISTPASSIVETARGET  0x4B
 
 #define PN532_WAKEUP                        0x55
 
-#define PN532_SPI_STATREAD                  0x02
-#define PN532_SPI_DATAWRITE                 0x01
-#define PN532_SPI_DATAREAD                  0x03
-#define PN532_SPI_READY                     0x01
-
 #define PN532_MIFARE_ISO14443A              0x00
-
-#define MIFARE_CMD_AUTH_A                   0x60
-#define MIFARE_CMD_AUTH_B                   0x61
-#define MIFARE_CMD_READ                     0x30
-#define MIFARE_CMD_WRITE                    0xA0
-#define MIFARE_CMD_TRANSFER                 0xB0
-#define MIFARE_CMD_DECREMENT                0xC0
-#define MIFARE_CMD_INCREMENT                0xC1
-#define MIFARE_CMD_STORE                    0xC2
 
 /* Mifare Ultralight Commands */
 #define ULTRALIGHT_CMD_REQUEST              0x26
