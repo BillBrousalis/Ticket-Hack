@@ -14,7 +14,7 @@ void dump()
   const char *fname = getenv("FNAME");
   std::ofstream savefile;
   if(fname == NULL) {
-    savefile.open("memory_dumps/latest_memdump.txt");
+    savefile.open("memory_dumps/latest_memdump.dmp");
   }
   else {
     savefile.open("memory_dumps/" + (std::string)fname);
@@ -57,7 +57,7 @@ void overwrite()
   const char *fname = getenv("FNAME");
   std::ifstream dumpfile;
   if(fname == NULL) {
-    dumpfile.open("memory_dumps/latest_memdump.txt");
+    dumpfile.open("memory_dumps/latest_memdump.dmp");
   }
   else {
     dumpfile.open("memory_dumps/" + (std::string)fname);
