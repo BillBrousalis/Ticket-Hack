@@ -210,8 +210,20 @@ std::vector<uint8_t> pn532::ultralight_read_page(int page)
   return slice(response, 1, PAGELENGTH+1);
 }
 
-int pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)
+uint8_t pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)
 {
+  assert(dat.size() == PAGELENGTH);
+  assert(0 <= page && page < MAXPAGES);
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ultralight_write_page )" << std::endl; }
-  return 0;
+  //std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_COMPWRITE, (uint8_t)page};
+  std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_WRITE, (uint8_t)page};
+  for(int i=0; i<(int)dat.size(); ++i) {
+    params.push_back(dat[i]);
+  }
+
+  hprint(params, "PARAMS:");
+
+  std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 1, params);
+  assert(response.size() > 0);
+  return response[0];
 }
