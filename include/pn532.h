@@ -62,6 +62,7 @@ public:
   std::vector<uint8_t> read_passive_target(int baud=PN532_MIFARE_ISO14443A);
   std::vector<uint8_t> ultralight_read_page(int page);
   uint8_t ultralight_write_page(std::vector<uint8_t> dat, int page);
+  std::vector<uint8_t> auth();
 
 private:
   int DEBUG_LVL;

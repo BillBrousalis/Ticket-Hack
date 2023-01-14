@@ -31,6 +31,9 @@ void dump()
   std::vector<uint8_t> uid = dev.read_passive_target();
   hprint(uid, "[+] Card UID: ", '-', UID_LENGTH);
   std::cout << std::endl;
+std::vector<std::string> headers = {
+    "UID0 - UID2 / BCC0", "UID3 - UDI6", "BCC1 / INT. / LOCK0 - LOCK1", "OTP0 - OTP3", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "DATA", "LOCK2 - LOCK4", "CFG 0 (MIRROR / AUTH0)", "CFG 1 (ACCESS)", "PWD0 - PWD3", "PACK0 - PACK1"
+  };
 
   std::cout << "[-Dumping Memory-]" << std::endl;
   std::vector<uint8_t> data;
@@ -44,7 +47,7 @@ void dump()
       printf("%02x", data[ii]);
       if(ii != PAGELENGTH-1) { printf(" : "); }
     }
-    std::cout << std::endl;
+    std::cout << "   ( " << headers[page] <<  " )" << std::endl;
   }
 
   savefile.close();
@@ -71,12 +74,18 @@ void overwrite()
   hprint(ver, "[+] Firmware Version:", ':', FIRMWARE_VERSION_LEN);
   std::cout << std::endl;
 
+  std::vector<uint8_t> uid = dev.read_passive_target();
+  hprint(uid, "[+] Card UID: ", '-', UID_LENGTH);
+  std::cout << std::endl;
+
+
+  //std::vector<uint8_t> authout = dev.auth();
+  //hprint(authout, "AUTHOUT:");
+
   std::cout << "[-Memory Overwriting-]\n" << std::endl;
-  std::vector<uint8_t> data {0x0, 0x0, 0x0, 0x0};
-  for(int i=4; i<30; ++i) {
-    uint8_t out = dev.ultralight_write_page(data, i);
-    printf("out = 0x%02x\n", out);
-  }
+  std::vector<uint8_t> data {0x69, 0x69, 0x69, 0x69};
+  uint8_t out = dev.ultralight_write_page(data, 0xc);
+  printf("out = 0x%02x\n", out);
 }
 
 void menu()

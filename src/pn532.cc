@@ -220,10 +220,14 @@ uint8_t pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)
   for(int i=0; i<(int)dat.size(); ++i) {
     params.push_back(dat[i]);
   }
-
-  hprint(params, "PARAMS:");
-
   std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 1, params);
   assert(response.size() > 0);
   return response[0];
+}
+
+std::vector<uint8_t> pn532::auth()
+{
+  std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_PWDAUTH, 0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 1, params);
+  return response;
 }
