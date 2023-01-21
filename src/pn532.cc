@@ -196,6 +196,7 @@ std::vector<uint8_t> pn532::read_passive_target(int baud)
 
 std::vector<uint8_t> pn532::ultralight_read_page(int page)
 {
+  assert(0 <= page && page < MAXPAGES);
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ultralight_read_page )" << std::endl; }
   std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_READ, (uint8_t)page};
   std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 17, params);
