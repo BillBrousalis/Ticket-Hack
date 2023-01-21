@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <libserial/SerialPort.h>
 
-#define DEFAULT_TIMEOUT 250
+#define DEFAULT_TIMEOUT 22
 
 class Serial {
 public:
@@ -16,7 +16,7 @@ public:
   void close_serial();
   uint8_t readbyte(int timeout=DEFAULT_TIMEOUT);
   std::vector<uint8_t> read(int expected_sz, int timeout=DEFAULT_TIMEOUT);
-  void write(std::vector<uint8_t> buf);
+  void write(const std::vector<uint8_t> buf);
 
 private:
   LibSerial::SerialPort serial;

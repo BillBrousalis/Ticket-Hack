@@ -26,7 +26,7 @@ pn532::~pn532()
   std::cout << "[-] Closing PN532..." << std::endl;
 }
 
-int pn532::write_frame(std::vector<uint8_t> dat)
+int pn532::write_frame(const std::vector<uint8_t> dat)
 {
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::write_frame )" << std::endl; }
   int sz = (int)dat.size();
@@ -49,7 +49,7 @@ int pn532::write_frame(std::vector<uint8_t> dat)
     if(DEBUG_LVL >= 1) { hprint(frame, "( write_frame ) frame:"); }
     ser.write(frame);
     ack = ack_wait();
-    sleepms(10);
+    //sleepms(1);
   }
   return ack;
 }
@@ -76,33 +76,28 @@ std::vector<uint8_t> pn532::read_frame(int res_length)
   assert(pn532_ack.size() <= response.size());
   if(equal_slice(pn532_ack, response, 0, (int)pn532_ack.size())) {
     std::cerr << "[-] !!! NO CARD !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("[-] !!! NO CARD !!!");
   }
   if(response[0] != 0x00) {
-    std::cerr << "[-] !!! response[0] != 0x00 !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("[-] !!! response[0] != 0x00 !!!");
   }
   int off = 1;
   while(response[off] == 0x00) {
     off++;
     if(off >= (int)response.size()) {
-      std::cout << "[-] !!! Response frame preamble does not contain 00:FF (1) !!!" << std::endl;
-      exit(-1);
+      throw std::runtime_error("[-] !!! Response frame preamble does not contain 00:FF (1) !!!");
     }
   }
   if(response[off] != 0xff) {
-    std::cerr << "[-] !!! Response frame preamble does not contain 00:FF (2) !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("[-] !!! Response frame preamble does not contain 00:FF (2) !!!");
   }
   off++;
   if(off >= (int)response.size()) {
-    std::cerr << "[-] !!! Response does not contain data !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("[-] !!! Response does not contain data !!!");
   }
   uint8_t frame_len = response[off];
   if(((frame_len + response[off+1]) & 0xff) != 0x00) {
-    std::cerr << "[-] !!! Response length checksum does not match length !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("[-] !!! Response length checksum does not match length !!!");
   }
   std::vector<uint8_t> frame = slice(response, off+2, off+2+frame_len+1);//(frame_len+1, 0x00);
 
@@ -112,8 +107,7 @@ std::vector<uint8_t> pn532::read_frame(int res_length)
   }
 
   if(checksum(frame, 0x00) != 0x00) {
-    std::cerr << "[-] !!! Response checksum is not 0x00 !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("[-] !!! Response checksum is not 0x00 !!!");
   }
   return frame;
 }
@@ -129,7 +123,7 @@ int pn532::ack_wait()
   auto start = get_time();
   auto now = get_time();
   while(elapsed_time_ms(now, start) < timeout && ack != 1) {
-    sleepms(10);
+    //sleepms(1);
     rx.erase(rx.begin());
     rx.push_back(ser.readbyte(timeout=timeout));
     if(pn532_ack == rx) {
@@ -155,7 +149,7 @@ void pn532::SAM_config()
   call_func(PN532_COMMAND_SAMCONFIGURATION, 0, params);
 }
 
-std::vector<uint8_t> pn532::call_func(uint8_t command, int res_length, std::vector<uint8_t> params)
+std::vector<uint8_t> pn532::call_func(uint8_t command, int res_length, const std::vector<uint8_t> params)
 {
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::call_func )" << std::endl; }
 
@@ -175,8 +169,7 @@ std::vector<uint8_t> pn532::call_func(uint8_t command, int res_length, std::vect
   if(DEBUG_LVL >= 2) { hprint(response, "( pn532::call_func ) read_frame response:"); }
 
   if(response[0] != PN532_PN532TOHOST || response[1] != (command+0x01)) {
-    std::cerr << "!!! Unexpected command response !!!" << std::endl;
-    exit(-1);
+    throw std::runtime_error("!!! Unexpected command response !!!");
   }
 
   if(res_length == 0) {
@@ -210,12 +203,12 @@ std::vector<uint8_t> pn532::ultralight_read_page(int page)
   return slice(response, 1, PAGELENGTH+1);
 }
 
-uint8_t pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)
+uint8_t pn532::ultralight_write_page(const std::vector<uint8_t> dat, int page)
 {
   assert(dat.size() == PAGELENGTH);
   assert(0 <= page && page < MAXPAGES);
   if(DEBUG_LVL >= 3) { std::cout << std::endl << "( pn532::ultralight_write_page )" << std::endl; }
-  //std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_COMPWRITE, (uint8_t)page};
+  //std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_COMPWRITE, (uint8_t)page}; // compatibility-write
   std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_WRITE, (uint8_t)page};
   for(int i=0; i<(int)dat.size(); ++i) {
     params.push_back(dat[i]);
@@ -225,9 +218,13 @@ uint8_t pn532::ultralight_write_page(std::vector<uint8_t> dat, int page)
   return response[0];
 }
 
-std::vector<uint8_t> pn532::auth()
+std::vector<uint8_t> pn532::pwd_auth(const std::vector<uint8_t> passwd)
 {
-  std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_PWDAUTH, 0x00, 0x00, 0x00, 0x00};
-  std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 1, params);
+  assert(passwd.size() == 4);
+  std::vector<uint8_t> params {0x01, ULTRALIGHT_CMD_PWDAUTH};
+  for(int i=0; i<4; ++i) {
+    params.push_back(passwd[i]);
+  }
+  std::vector<uint8_t> response = call_func(PN532_COMMAND_INDATAEXCHANGE, 17, params);
   return response;
 }

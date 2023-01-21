@@ -41,7 +41,7 @@ std::vector<uint8_t> Serial::read(int expected_sz, int timeout)
   return buf;
 }
 
-void Serial::write(std::vector<uint8_t> buf)
+void Serial::write(const std::vector<uint8_t> buf)
 {
   for(int i=0; i<(int)buf.size(); ++i) {
     serial.WriteByte(buf[i]);
