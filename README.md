@@ -1,4 +1,5 @@
-# (Work in progress) - Free transportation for the people
+# -Work in progress-
+# Free transportation for the people
 
 Cloning disposable Mifare Ultralight EV1 tickets, using UID re-writtable cards.
 
