@@ -75,7 +75,6 @@ std::vector<uint8_t> pn532::read_frame(int res_length)
 
   assert(pn532_ack.size() <= response.size());
   if(equal_slice(pn532_ack, response, 0, (int)pn532_ack.size())) {
-    std::cerr << "[-] !!! NO CARD !!!" << std::endl;
     throw std::runtime_error("[-] !!! NO CARD !!!");
   }
   if(response[0] != 0x00) {

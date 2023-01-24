@@ -31,7 +31,7 @@ void hprint(const std::vector<uint8_t> buf, std::string info, char separator, in
   int len;
   if(limited_len == 0) { len = (int)buf.size(); }
   else { len = limited_len; }
-  std::cout << info << std::endl;;
+  std::cout << info << std::endl;
   for(int i=0; i<len; ++i) {
     printf("%02x", buf[i]);
     if(i != len-1) { printf(" %c ", separator); }
