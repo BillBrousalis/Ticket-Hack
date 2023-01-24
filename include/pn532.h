@@ -57,7 +57,6 @@ public:
   void echo_test();
   void wakeup();
   void SAM_config();
-  std::vector<uint8_t> call_func(uint8_t command, int res_length, const std::vector<uint8_t> params);
   std::vector<uint8_t> get_firmware_version();
   std::vector<uint8_t> read_passive_target(int baud=PN532_MIFARE_ISO14443A);
   std::vector<uint8_t> ultralight_read_page(int page);
@@ -69,6 +68,7 @@ private:
   int timeout;
   int write_frame(const std::vector<uint8_t> dat);
   std::vector<uint8_t> read_frame(int res_length);
+  std::vector<uint8_t> call_func(uint8_t command, int res_length, const std::vector<uint8_t> params);
   int ack_wait();
 };
 
